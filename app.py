@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 import sys
 from pathlib import Path
 
@@ -19,12 +18,28 @@ from forecast_arena.forecast import ForecastConfig
 load_dotenv()
 
 
+PROVIDERS = ["anthropic", "openai", "google", "moonshot", "alibaba", "deepseek", "meta"]
+
+DEFAULT_MODELS: dict[str, str] = {
+    "anthropic": "claude-haiku-4-5",
+    "openai": "gpt-4.1-mini",
+    "google": "gemini-2.5-flash",
+    "moonshot": "kimi-k2-0905-preview",
+    "deepseek": "deepseek-chat",
+    "alibaba": "qwen-plus",
+    "meta": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+}
+
+
 def build_config(args: argparse.Namespace) -> tuple[ForecastConfig, str]:
     if args.swarm > 1:
-        agents = [Agent("anthropic", args.model) for _ in range(args.swarm)]
-        label = f"voting_swarm ({args.swarm}x {args.model})"
+        agents = [Agent(args.provider, args.model) for _ in range(args.swarm)]
+        label = f"voting_swarm ({args.swarm}x {args.provider}/{args.model})"
         return VotingSwarm(agents), label
-    return SingleLLM(Agent("anthropic", args.model)), f"single_llm ({args.model})"
+    return (
+        SingleLLM(Agent(args.provider, args.model)),
+        f"single_llm ({args.provider}/{args.model})",
+    )
 
 
 def main() -> None:
@@ -36,9 +51,15 @@ def main() -> None:
         help="The forecasting question (e.g. 'Will SpaceX land humans on Mars by 2030?')",
     )
     parser.add_argument(
+        "--provider",
+        default="anthropic",
+        choices=PROVIDERS,
+        help="Model provider (default: anthropic)",
+    )
+    parser.add_argument(
         "--model",
-        default="claude-haiku-4-5",
-        help="Anthropic model ID (default: claude-haiku-4-5)",
+        default=None,
+        help="Model ID. If omitted, uses the cheap workhorse for --provider.",
     )
     parser.add_argument(
         "--swarm",
@@ -51,10 +72,8 @@ def main() -> None:
 
     if args.swarm < 1:
         sys.exit("Error: --swarm must be >= 1")
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        sys.exit(
-            "Error: ANTHROPIC_API_KEY is not set. Export it or source your .env file."
-        )
+    if args.model is None:
+        args.model = DEFAULT_MODELS[args.provider]
 
     config, label = build_config(args)
     result = asyncio.run(config.run(args.question))
