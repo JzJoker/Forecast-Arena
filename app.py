@@ -24,7 +24,7 @@ DEFAULT_MODELS: dict[str, str] = {
     "anthropic": "claude-haiku-4-5",
     "openai": "gpt-4.1-mini",
     "google": "gemini-2.5-flash",
-    "moonshot": "kimi-k2-0905-preview",
+    "moonshot": "kimi-k2.6",
     "deepseek": "deepseek-chat",
     "alibaba": "qwen-plus",
     "meta": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",

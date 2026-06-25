@@ -56,7 +56,7 @@ PRICING: dict[str, ModelPricing] = {
     "gemini-2.5-flash": ModelPricing(0.3, 2.5),
     "gemini-2.0-flash": ModelPricing(0.1, 0.4),
     # --- Moonshot (Kimi) ---
-    "kimi-k2-0905-preview": ModelPricing(0.6, 2.5),
+    "kimi-k2.6": ModelPricing(0.95, 4.0),
     # --- DeepSeek ---
     "deepseek-chat": ModelPricing(0.27, 1.10),
     "deepseek-reasoner": ModelPricing(0.55, 2.19),
