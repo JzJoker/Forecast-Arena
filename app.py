@@ -42,6 +42,33 @@ def build_config(args: argparse.Namespace) -> tuple[ForecastConfig, str]:
     )
 
 
+async def _spinner(message: str) -> None:
+    frames = "|/-\\"
+    i = 0
+    try:
+        while True:
+            sys.stderr.write(f"\r{message} {frames[i % len(frames)]}")
+            sys.stderr.flush()
+            i += 1
+            await asyncio.sleep(0.2)
+    except asyncio.CancelledError:
+        sys.stderr.write("\r" + " " * (len(message) + 4) + "\r")
+        sys.stderr.flush()
+        raise
+
+
+async def _run_with_indicator(config: ForecastConfig, question: str, message: str):
+    spinner = asyncio.create_task(_spinner(message))
+    try:
+        return await config.run(question)
+    finally:
+        spinner.cancel()
+        try:
+            await spinner
+        except asyncio.CancelledError:
+            pass
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run a forecast through a single LLM or a voting swarm."
@@ -76,7 +103,8 @@ def main() -> None:
         args.model = DEFAULT_MODELS[args.provider]
 
     config, label = build_config(args)
-    result = asyncio.run(config.run(args.question))
+    indicator = "Thinking and Voting..." if args.swarm > 1 else "Thinking..."
+    result = asyncio.run(_run_with_indicator(config, args.question, indicator))
     forecast = result.forecast
 
     print()
