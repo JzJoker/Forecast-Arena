@@ -18,6 +18,14 @@ _SUPPORTED_PROVIDERS: set[str] = {
 }
 
 
+class AgentCallError(RuntimeError):
+    def __init__(self, provider: str, model: str, original: BaseException):
+        self.provider = provider
+        self.model = model
+        self.original = original
+        super().__init__(f"[{provider}/{model}] {type(original).__name__}: {original}")
+
+
 @dataclass
 class AgentResponse:
     text: str
@@ -97,23 +105,26 @@ class Agent:
     async def arun(self, prompt: str) -> AgentResponse:
         started = time.perf_counter()
 
-        if self.provider == "anthropic":
-            from forecast_arena.providers.anthropic import call_anthropic
-            text, input_tokens, output_tokens, raw = await call_anthropic(
-                model=self.model,
-                system_prompt=self.system_prompt,
-                prompt=prompt,
-                max_tokens=self.max_tokens,
-            )
-        else:
-            from forecast_arena.providers.openai_compatible import call_openai_compatible
-            text, input_tokens, output_tokens, raw = await call_openai_compatible(
-                provider=self.provider,
-                model=self.model,
-                system_prompt=self.system_prompt,
-                prompt=prompt,
-                max_tokens=self.max_tokens,
-            )
+        try:
+            if self.provider == "anthropic":
+                from forecast_arena.providers.anthropic import call_anthropic
+                text, input_tokens, output_tokens, raw = await call_anthropic(
+                    model=self.model,
+                    system_prompt=self.system_prompt,
+                    prompt=prompt,
+                    max_tokens=self.max_tokens,
+                )
+            else:
+                from forecast_arena.providers.openai_compatible import call_openai_compatible
+                text, input_tokens, output_tokens, raw = await call_openai_compatible(
+                    provider=self.provider,
+                    model=self.model,
+                    system_prompt=self.system_prompt,
+                    prompt=prompt,
+                    max_tokens=self.max_tokens,
+                )
+        except Exception as e:
+            raise AgentCallError(self.provider, self.model, e) from e
 
         latency_ms = (time.perf_counter() - started) * 1000
 

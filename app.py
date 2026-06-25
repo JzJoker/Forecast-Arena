@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from dotenv import load_dotenv
 
-from forecast_arena import Agent
+from forecast_arena import Agent, AgentCallError
 from forecast_arena.configs.single import SingleLLM
 from forecast_arena.configs.swarm import VotingSwarm
 from forecast_arena.forecast import ForecastConfig
@@ -134,7 +134,10 @@ def main() -> None:
     config, label = build_config(args)
     is_swarm = isinstance(config, VotingSwarm)
     indicator = "Thinking and Voting..." if is_swarm else "Thinking..."
-    result = asyncio.run(_run_with_indicator(config, args.question, indicator))
+    try:
+        result = asyncio.run(_run_with_indicator(config, args.question, indicator))
+    except AgentCallError as e:
+        sys.exit(f"Error: {e}")
     forecast = result.forecast
 
     print()
