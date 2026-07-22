@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from dotenv import load_dotenv
 
 from forecast_arena import Agent, AgentCallError
+from forecast_arena.configs.council import LLMCouncil
 from forecast_arena.configs.single import SingleLLM
 from forecast_arena.configs.swarm import VotingSwarm
 from forecast_arena.forecast import ForecastConfig
@@ -31,9 +32,19 @@ DEFAULT_MODELS: dict[str, str] = {
 }
 
 DEFAULT_SWARM_PROVIDERS = ["anthropic", "google", "openai", "moonshot", "deepseek"]
+DEFAULT_COUNCIL_PROVIDERS = DEFAULT_SWARM_PROVIDERS
 
 
 def build_config(args: argparse.Namespace) -> tuple[ForecastConfig, str]:
+    if args.council_providers:
+        providers = args.council_providers
+        agents = [Agent(p, DEFAULT_MODELS[p]) for p in providers]
+        label = f"llm_council ({len(providers)} agents: {', '.join(providers)})"
+        return LLMCouncil(agents), label
+    if args.council:
+        agents = [Agent(p, DEFAULT_MODELS[p]) for p in DEFAULT_COUNCIL_PROVIDERS]
+        label = f"llm_council (default mix: {', '.join(DEFAULT_COUNCIL_PROVIDERS)})"
+        return LLMCouncil(agents), label
     if args.swarm_providers:
         providers = args.swarm_providers
         agents = [Agent(p, DEFAULT_MODELS[p]) for p in providers]
@@ -126,14 +137,36 @@ def main() -> None:
             "Overrides --swarm if both are set."
         ),
     )
+    parser.add_argument(
+        "--council",
+        action="store_true",
+        help=(
+            "Run the LLM council (initial forecasts + peer-critique rounds) "
+            f"with the default provider mix ({', '.join(DEFAULT_COUNCIL_PROVIDERS)})."
+        ),
+    )
+    parser.add_argument(
+        "--council-providers",
+        type=_parse_provider_list,
+        default=None,
+        metavar="P1,P2,...",
+        help=(
+            "Comma-separated provider list for the LLM council. Overrides --council if both are set. "
+            "Takes precedence over --swarm / --swarm-providers."
+        ),
+    )
     args = parser.parse_args()
 
     if args.model is None:
         args.model = DEFAULT_MODELS[args.provider]
 
     config, label = build_config(args)
-    is_swarm = isinstance(config, VotingSwarm)
-    indicator = "Thinking and Voting..." if is_swarm else "Thinking..."
+    if isinstance(config, LLMCouncil):
+        indicator = "Deliberating..."
+    elif isinstance(config, VotingSwarm):
+        indicator = "Thinking and Voting..."
+    else:
+        indicator = "Thinking..."
     try:
         result = asyncio.run(_run_with_indicator(config, args.question, indicator))
     except AgentCallError as e:
